@@ -7,8 +7,8 @@
   "splashImageUrl": "https://nqscore.vercel.app/og.png",
   "splashBackgroundColor": "#1a0f18",
   "accountAssociation": {
-    "header": "0x",
-    "payload": "0x",
-    "signature": "0x"
+    "header": "eyJmaWQiOjI5MTA0OSwidHlwZSI6ImF1dGgiLCJrZXkiOiIweDMyNjhkMEYyNjMxOTA3RTU2ZjQxYTJCM2M4NDZlMUNiODA0YWZiYzAifQ",
+    "payload": "eyJkb21haW4iOiJucXNjb3JlLnZlcmNlbC5hcHAifQ",
+    "signature": "53U9RqJtguBMz8k1PHEfQJY1akwzFGlHepI7aLUk3OhQGizQ5p3vypBf/8+YhezcUG9lHzuGHfXSR+rLElCfYxs="
   }
 }
