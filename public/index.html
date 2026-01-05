@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FC Score Checker</title>
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="FC Score Checker" />
+  <meta property="og:description" content="Cek Neynar user score & Quotient score dari FID/username." />
+  <meta property="og:image" content="/og.png" />
+  <meta property="og:url" content="/" />
+  <meta property="og:type" content="website" />
+
+  <!-- Mini App / Frame embed (agar bisa dishare sebagai rich embed) -->
+  <!-- Catatan: beberapa client masih pakai fc:frame untuk embed interaktif -->
+  <meta
+    name="fc:frame"
+    content='{"version":"next","imageUrl":"https://YOUR_DOMAIN/og.png","button":{"title":"Open Score Checker","action":{"type":"launch_frame","name":"FC Score Checker","url":"https://YOUR_DOMAIN/"}}}'
+  />
+
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header class="header">
+      <h1>FC Score Checker</h1>
+      <p class="muted">Cek <b>Neynar user score</b> + <b>Quotient score</b> pakai FID atau username.</p>
+    </header>
+
+    <section class="card">
+      <label class="label" for="q">FID / Username</label>
+      <div class="row">
+        <input id="q" class="input" placeholder="contoh: 3  atau  neynar" autocomplete="off" />
+        <button id="btn" class="btn">Cek</button>
+      </div>
+      <p class="hint muted">Tip: username tanpa “@”.</p>
+      <div id="status" class="status muted"></div>
+    </section>
+
+    <section class="card">
+      <h2>Hasil</h2>
+      <pre id="out" class="pre">{}</pre>
+    </section>
+
+    <footer class="footer muted">
+      <span>Proxy API: <code>/api/scores</code></span>
+    </footer>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
