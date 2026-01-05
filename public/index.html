@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NQ Score Checker</title>
+  <title>FC Score Checker</title>
 
   <!-- Open Graph -->
-  <meta property="og:title" content="NQ Score Checker" />
+  <meta property="og:title" content="FC Score Checker" />
   <meta property="og:description" content="Check Neynar and Quotient scores using FID or username." />
   <meta property="og:image" content="/og.png" />
   <meta property="og:url" content="https://nqscore.vercel.app/" />
@@ -18,7 +18,7 @@
     content='{"version":"next","imageUrl":"https://nqscore.vercel.app/og.png","button":{"title":"Open Score Checker","action":{"type":"launch_frame","name":"FC Score Checker","url":"https://nqscore.vercel.app/"}}}'
   />
 
-  <!-- Farcaster Frame SDK (for ready()) -->
+  <!-- Farcaster Mini App SDK -->
   <script src="https://unpkg.com/@farcaster/frame-sdk/dist/index.umd.js"></script>
 
   <!-- CSS -->
@@ -73,9 +73,9 @@
   </div>
 
   <script>
-    /* ===== FARCASTER READY SIGNAL ===== */
-    if (window.frame && typeof window.frame.ready === "function") {
-      window.frame.ready();
+    /* ===== FARCASTER MINI APP READY (CORRECT) ===== */
+    if (window.farcaster && typeof window.farcaster.ready === "function") {
+      window.farcaster.ready();
     }
 
     function isNumber(v) {
