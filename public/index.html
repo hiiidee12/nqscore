@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,47 +7,173 @@
 
   <!-- Open Graph -->
   <meta property="og:title" content="FC Score Checker" />
-  <meta property="og:description" content="Cek Neynar user score & Quotient score dari FID/username." />
+  <meta property="og:description" content="Check Neynar and Quotient scores using FID or username." />
   <meta property="og:image" content="/og.png" />
-  <meta property="og:url" content="/" />
+  <meta property="og:url" content="https://nqscore.vercel.app/" />
   <meta property="og:type" content="website" />
 
-  <!-- Mini App / Frame embed (agar bisa dishare sebagai rich embed) -->
-  <!-- Catatan: beberapa client masih pakai fc:frame untuk embed interaktif -->
+  <!-- Farcaster Mini App -->
   <meta
     name="fc:frame"
-    content='{"version":"next","imageUrl":"https://YOUR_DOMAIN/og.png","button":{"title":"Open Score Checker","action":{"type":"launch_frame","name":"FC Score Checker","url":"https://YOUR_DOMAIN/"}}}'
+    content='{"version":"next","imageUrl":"https://nqscore.vercel.app/og.png","button":{"title":"Open Score Checker","action":{"type":"launch_frame","name":"FC Score Checker","url":"https://nqscore.vercel.app/"}}}'
   />
 
+  <!-- CSS -->
   <link rel="stylesheet" href="/styles.css" />
 </head>
+
 <body>
-  <main class="wrap">
-    <header class="header">
-      <h1>FC Score Checker</h1>
-      <p class="muted">Cek <b>Neynar user score</b> + <b>Quotient score</b> pakai FID atau username.</p>
-    </header>
+  <div class="wrap">
+    <h1>FC Score Checker</h1>
+    <div class="muted">
+      Check Neynar and Quotient scores using FID or username.
+    </div>
 
-    <section class="card">
-      <label class="label" for="q">FID / Username</label>
-      <div class="row">
-        <input id="q" class="input" placeholder="contoh: 3  atau  neynar" autocomplete="off" />
-        <button id="btn" class="btn">Cek</button>
+    <!-- INPUT CARD -->
+    <div class="card">
+      <div class="label">FID / Username</div>
+      <input id="q" placeholder="e.g. 3 or neynar" />
+      <button id="btn" onclick="run()">Check</button>
+      <div class="muted" style="margin-top:8px">
+        Tip: use username without "@"
       </div>
-      <p class="hint muted">Tip: username tanpa “@”.</p>
-      <div id="status" class="status muted"></div>
-    </section>
+      <div id="status" class="muted" style="margin-top:10px"></div>
+    </div>
 
-    <section class="card">
-      <h2>Hasil</h2>
-      <pre id="out" class="pre">{}</pre>
-    </section>
+    <!-- RESULT CARD -->
+    <div class="card">
+      <div class="row-between">
+        <h2 style="margin:0">Scores</h2>
+        <span id="badge" class="badge" style="display:none">-</span>
+      </div>
 
-    <footer class="footer muted">
-      <span>Proxy API: <code>/api/scores</code></span>
-    </footer>
-  </main>
+      <div class="kv">
+        <div class="k">User</div>
+        <div class="v" id="userLine">-</div>
 
-  <script src="/app.js"></script>
+        <div class="k">Neynar score</div>
+        <div class="v" id="neynarScore">-</div>
+
+        <div class="k">Quotient score</div>
+        <div class="v" id="quotientScore">-</div>
+      </div>
+
+      <details class="details">
+        <summary>Show raw JSON</summary>
+        <pre id="out">{}</pre>
+      </details>
+    </div>
+
+    <div class="muted" style="margin-top:12px;text-align:center">
+      Proxy API: <code>/api/scores</code>
+    </div>
+  </div>
+
+  <script>
+    function isNumber(v) {
+      return /^[0-9]+$/.test(String(v).trim());
+    }
+
+    function setStatus(msg) {
+      document.getElementById("status").textContent = msg || "";
+    }
+
+    /* ===== SCORE LEVEL (FINAL RULE) =====
+       0.00 – 0.50  → Low
+       0.51 – 0.70  → Medium
+       0.71 – 1.00  → High
+    */
+    function scoreLevel(s) {
+      if (s == null || Number.isNaN(Number(s))) return null;
+      const x = Number(s);
+      if (x <= 0.5) return "Low";
+      if (x <= 0.7) return "Medium";
+      return "High";
+    }
+
+    function overallLevel(neynar, quotient) {
+      // Prefer Neynar; fallback to Quotient
+      return scoreLevel(neynar) || scoreLevel(quotient) || null;
+    }
+
+    function setBadge(level) {
+      const el = document.getElementById("badge");
+      if (!level) {
+        el.style.display = "none";
+        el.textContent = "-";
+        el.className = "badge";
+        return;
+      }
+      el.style.display = "inline-flex";
+      el.textContent = level;
+      el.className = "badge badge-" + level.toLowerCase();
+    }
+
+    function pretty(v) {
+      return JSON.stringify(v, null, 2);
+    }
+
+    async function run() {
+      const input = document.getElementById("q");
+      const btn = document.getElementById("btn");
+      const out = document.getElementById("out");
+
+      const userLine = document.getElementById("userLine");
+      const neynarScoreEl = document.getElementById("neynarScore");
+      const quotientScoreEl = document.getElementById("quotientScore");
+
+      const raw = input.value.trim();
+      if (!raw) {
+        setStatus("Enter a FID or username.");
+        return;
+      }
+
+      btn.disabled = true;
+      setStatus("Fetching...");
+      out.textContent = "{ }";
+      userLine.textContent = "-";
+      neynarScoreEl.textContent = "-";
+      quotientScoreEl.textContent = "-";
+      setBadge(null);
+
+      try {
+        const params = new URLSearchParams();
+        if (isNumber(raw)) params.set("fid", raw);
+        else params.set("username", raw.replace(/^@/, ""));
+
+        const res = await fetch("/api/scores?" + params.toString());
+        const data = await res.json();
+
+        if (!res.ok) {
+          setStatus(`Error (${res.status})`);
+          out.textContent = pretty(data);
+          return;
+        }
+
+        const resolved = data?.resolved || {};
+        const scores = data?.scores || {};
+
+        const fid = resolved?.fid ?? "-";
+        const uname = resolved?.username ? "@" + resolved.username : "-";
+        userLine.textContent = `${uname} (FID: ${fid})`;
+
+        const neynar = scores?.neynarUserScore ?? null;
+        const quotient = scores?.quotientScore ?? null;
+
+        neynarScoreEl.textContent = neynar ?? "-";
+        quotientScoreEl.textContent = quotient ?? "-";
+
+        setBadge(overallLevel(neynar, quotient));
+        setStatus("Done");
+
+        out.textContent = pretty({ resolved, scores });
+      } catch (e) {
+        setStatus("Error fetching data");
+        out.textContent = pretty({ error: String(e) });
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  </script>
 </body>
 </html>
