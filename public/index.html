@@ -18,6 +18,9 @@
     content='{"version":"next","imageUrl":"https://nqscore.vercel.app/og.png","button":{"title":"Open Score Checker","action":{"type":"launch_frame","name":"FC Score Checker","url":"https://nqscore.vercel.app/"}}}'
   />
 
+  <!-- Farcaster Frame SDK (for ready()) -->
+  <script src="https://unpkg.com/@farcaster/frame-sdk/dist/index.umd.js"></script>
+
   <!-- CSS -->
   <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -70,6 +73,11 @@
   </div>
 
   <script>
+    /* ===== FARCASTER READY SIGNAL ===== */
+    if (window.frame && typeof window.frame.ready === "function") {
+      window.frame.ready();
+    }
+
     function isNumber(v) {
       return /^[0-9]+$/.test(String(v).trim());
     }
@@ -78,7 +86,7 @@
       document.getElementById("status").textContent = msg || "";
     }
 
-    /* ===== SCORE LEVEL (FINAL RULE) =====
+    /* ===== SCORE LEVEL RULE =====
        0.00 – 0.50  → Low
        0.51 – 0.70  → Medium
        0.71 – 1.00  → High
