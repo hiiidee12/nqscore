@@ -1,163 +1,124 @@
 export default async function handler(req, res) {
   try {
-    if (req.method !== "GET") {
-      return res.status(405).json({ error: "Method not allowed. Use GET." });
+    // --- input: fid or username ---
+    const q = req.query || {};
+    const input = (q.fid || q.username || q.user || "").toString().trim();
+
+    if (!input) {
+      return res.status(400).json({ error: "Missing query: fid or username" });
     }
 
     const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
-    const QUOTIENT_API_KEY = process.env.QUOTIENT_API_KEY;
+    const QUOTIENT_API_KEY = process.env.QUOTIENT_API_KEY; // optional
 
     if (!NEYNAR_API_KEY) {
       return res.status(500).json({ error: "Missing env: NEYNAR_API_KEY" });
     }
-    if (!QUOTIENT_API_KEY) {
-      return res.status(500).json({ error: "Missing env: QUOTIENT_API_KEY" });
-    }
 
-    const { fid, username } = req.query;
+    // --- resolve fid + username via Neynar ---
+    // If input is numeric => treat as fid, else username (without @)
+    const isFid = /^\d+$/.test(input);
+    const fid = isFid ? Number(input) : null;
+    const username = isFid ? null : input.replace(/^@/, "");
 
-    if ((!fid || String(fid).trim() === "") && (!username || String(username).trim() === "")) {
-      return res.status(400).json({ error: "Provide fid or username" });
-    }
+    // Neynar: resolve user
+    const neynarUserUrl = fid
+      ? `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`
+      : `https://api.neynar.com/v2/farcaster/user/search?q=${encodeURIComponent(username)}&limit=1`;
 
-    // ---------- Resolve user via Neynar ----------
-    let resolvedFid = null;
-    let resolvedUsername = null;
-    let neynarUserScore = null;
-    let neynarUserRaw = null;
-
-    const neynarHeaders = {
-      accept: "application/json",
-      "x-api-key": NEYNAR_API_KEY,
-      "x-neynar-experimental": "true" // ensures experimental.neynar_user_score is included
-    };
-
-    if (fid && String(fid).trim() !== "") {
-      const f = String(fid).trim();
-      if (!/^\d+$/.test(f)) {
-        return res.status(400).json({ error: "fid must be a number" });
-      }
-
-      const url =
-        "https://api.neynar.com/v2/farcaster/user/bulk/?fids=" +
-        encodeURIComponent(f);
-
-      const r = await fetch(url, { headers: neynarHeaders });
-      const j = await r.json().catch(() => ({}));
-
-      if (!r.ok) {
-        return res.status(r.status).json({ error: "Neynar API error", details: j });
-      }
-
-      const user = Array.isArray(j?.users) ? j.users[0] : null;
-      if (!user) {
-        return res.status(404).json({ error: "User not found by fid" });
-      }
-
-      resolvedFid = user.fid ?? Number(f);
-      resolvedUsername = user.username ?? null;
-      neynarUserScore =
-        user?.experimental?.neynar_user_score ??
-        user?.experimental?.neynar_user_score?.score ??
-        user?.neynar_user_score ??
-        null;
-
-      neynarUserRaw = user;
-    } else {
-      const u = String(username).trim().replace(/^@/, "");
-      if (!u) return res.status(400).json({ error: "username is empty" });
-
-      const url =
-        "https://api.neynar.com/v2/farcaster/user/by_username/?username=" +
-        encodeURIComponent(u);
-
-      const r = await fetch(url, { headers: neynarHeaders });
-      const j = await r.json().catch(() => ({}));
-
-      if (!r.ok) {
-        return res.status(r.status).json({ error: "Neynar API error", details: j });
-      }
-
-      const user = j?.user ?? null;
-      if (!user) {
-        return res.status(404).json({ error: "User not found by username" });
-      }
-
-      resolvedFid = user.fid ?? null;
-      resolvedUsername = user.username ?? u;
-      neynarUserScore =
-        user?.experimental?.neynar_user_score ??
-        user?.experimental?.neynar_user_score?.score ??
-        user?.neynar_user_score ??
-        null;
-
-      neynarUserRaw = user;
-    }
-
-    if (!resolvedFid) {
-      return res.status(400).json({ error: "Could not resolve fid from Neynar response" });
-    }
-
-    // normalize score to number if possible
-    if (neynarUserScore != null) {
-      const n = Number(neynarUserScore);
-      neynarUserScore = Number.isFinite(n) ? n : null;
-    }
-
-    // ---------- Quotient score ----------
-    let quotientScore = null;
-    let quotientRank = null;
-    let quotientRaw = null;
-
-    const qRes = await fetch("https://api.quotient.social/v1/user-reputation", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        accept: "application/json"
-      },
-      body: JSON.stringify({
-        fids: [Number(resolvedFid)],
-        api_key: QUOTIENT_API_KEY
-      })
+    const neynarUserResp = await fetch(neynarUserUrl, {
+      headers: { api_key: NEYNAR_API_KEY },
     });
 
-    const qJson = await qRes.json().catch(() => ({}));
-    if (qRes.ok) {
-      const row = Array.isArray(qJson?.data) ? qJson.data[0] : null;
-      if (row) {
-        const qs = Number(row.quotientScore);
-        quotientScore = Number.isFinite(qs) ? qs : null;
-
-        const qr = Number(row.quotientRank);
-        quotientRank = Number.isFinite(qr) ? qr : null;
-      }
-      quotientRaw = qJson;
-    } else {
-      // Don't fail whole request if Quotient fails; return partial results
-      quotientRaw = { error: "Quotient API error", status: qRes.status, details: qJson };
+    if (!neynarUserResp.ok) {
+      const t = await neynarUserResp.text();
+      return res.status(502).json({ error: "Neynar user lookup failed", detail: t });
     }
 
-    // ---------- Response (matches your index.html expectation) ----------
+    const neynarUserJson = await neynarUserResp.json();
+
+    // Extract user
+    let user = null;
+    if (fid) {
+      // bulk returns { users: [...] }
+      user = (neynarUserJson.users && neynarUserJson.users[0]) || null;
+    } else {
+      // search returns { result: { users: [...] } } (can vary) - handle common shapes
+      user =
+        (neynarUserJson.result && neynarUserJson.result.users && neynarUserJson.result.users[0]) ||
+        (neynarUserJson.users && neynarUserJson.users[0]) ||
+        null;
+    }
+
+    if (!user || !user.fid) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const resolved = {
+      fid: user.fid,
+      username: user.username || null,
+      displayName: user.display_name || null,
+      pfpUrl: user.pfp_url || null,
+    };
+
+    // --- Neynar score ---
+    // (contoh endpoint; sesuaikan dengan yang kamu pakai sebelumnya kalau beda)
+    const neynarScoreUrl = `https://api.neynar.com/v2/farcaster/user/score?fid=${resolved.fid}`;
+    const neynarScoreResp = await fetch(neynarScoreUrl, {
+      headers: { api_key: NEYNAR_API_KEY },
+    });
+
+    let neynarUserScore = null;
+    if (neynarScoreResp.ok) {
+      const j = await neynarScoreResp.json();
+      neynarUserScore =
+        j?.score ??
+        j?.user_score ??
+        j?.result?.score ??
+        null;
+    }
+
+    // --- Quotient score (OPTIONAL) ---
+    let quotientScore = null;
+    let quotientRank = null;
+    let quotientError = null;
+
+    if (QUOTIENT_API_KEY) {
+      const quotientResp = await fetch("https://api.quotient.social/v1/user-reputation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fids: [resolved.fid],
+          api_key: QUOTIENT_API_KEY,
+        }),
+      });
+
+      if (quotientResp.ok) {
+        const qj = await quotientResp.json();
+        const row = qj?.data?.[0] || null;
+        quotientScore = row?.quotientScore ?? null;
+        quotientRank = row?.quotientRank ?? null;
+      } else {
+        quotientError = await quotientResp.text();
+      }
+    } else {
+      quotientError = "Missing env: QUOTIENT_API_KEY (optional)";
+    }
+
     return res.status(200).json({
       ok: true,
-      resolved: {
-        fid: resolvedFid,
-        username: resolvedUsername
-      },
+      resolved,
       scores: {
         neynarUserScore,
         quotientScore,
-        quotientRank
+        quotientRank,
       },
-      raw: {
-        neynar: neynarUserRaw,
-        quotient: quotientRaw
-      }
+      meta: {
+        quotientEnabled: Boolean(QUOTIENT_API_KEY),
+        quotientError: quotientError || null,
+      },
     });
-  } catch (err) {
-    return res.status(500).json({
-      error: "Server error",
-      details: String(err?.message || err)
-    });
+  } catch (e) {
+    return res.status(500).json({ error: "Server error", detail: String(e?.message || e) });
   }
 }
