@@ -6,9 +6,9 @@
   },
   "version": "1",
   "name": "FC Score Checker",
-  "description": "Check Neynar and Quotient scores using FID or username.",
-  "iconUrl": "https://nqscore.vercel.app/miniapp-card.png",
-  "homeUrl": "https://nqscore.vercel.app/",
   "splashImageUrl": "https://nqscore.vercel.app/splash.jpg",
   "splashBackgroundColor": "#1a0f18"
+  "description": "Check Neynar and Quotient scores using FID or username.",
+  "iconUrl": "https://nqscore.vercel.app/miniapp-card.png",
+  "homeUrl": "https://nqscore.vercel.app/"
 }
